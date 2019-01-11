@@ -2,6 +2,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <parallel/algorithm>
 
 #include "recommender.h"
 
@@ -132,7 +133,8 @@ size_t predictSongListening(
         } else return lhs.first < rhs.first;
     };
 
-    std::nth_element(cosResult.begin(), cosResult.begin() + topK - 1, cosResult.end(), cosComparer);
+    // waiting for c++ 17 in 2019
+    __gnu_parallel::nth_element(cosResult.begin(), cosResult.begin() + topK - 1, cosResult.end(), cosComparer);
 
     size_t sumOfMarks = 0;
     auto elemAfterKth = cosResult.begin() + topK;
