@@ -130,7 +130,7 @@ size_t predictSongListening(
             // if not same isExistsInLhs show if lhs precedes rhs
             // in straight-forward comparison need one more "if" :)
             return isExistsInLhs;
-        } else return lhs.first < rhs.first;
+        } else return lhs.first > rhs.first;
     };
 
     // waiting for c++ 17 in 2019
