@@ -1,6 +1,8 @@
 // #include <chrono>
 #include <iostream>
 
+#include <future>
+
 #include "recommender.h"
 #include "crossValidation.h"
 
@@ -16,7 +18,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Read data\n";
 
-    std::cout << "RMSE: " << crossValidationRMSE(data) << "\n";
+    auto rmse = std::async(std::launch::async, crossValidationRMSE, std::ref(data), static_cast<size_t>(10));
+    std::cout << "RMSE: " << rmse.get() << "\n";
     auto ndsg_gini = crossValidateNDCGandGini(data, songs);
     std::cout << "NDCG: " << ndsg_gini.first << "\nGINI: " << ndsg_gini.second << '\n';
     // printDataVectorWithNames(data);

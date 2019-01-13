@@ -4,6 +4,7 @@
 #include <iostream>
 #include <parallel/algorithm>
 #include <unordered_set>
+#include <mutex>
 
 #include "recommender.h"
 
@@ -117,10 +118,22 @@ size_t predictFromNeighborsWithSongMark(
     size_t curIndex = 0;
     vector<CosValueIndex> cosResult;
     cosResult.reserve(allUsersData.size());
-    for (auto&& user : allUsersData) {
-        cosResult.emplace_back(CosValueIndex(cosBetweenTwoUsers(userData, user), curIndex));
-        ++curIndex;
-    }
+
+//    for (auto&& user : allUsersData) {
+//        cosResult.emplace_back(CosValueIndex(cosBetweenTwoUsers(userData, user), curIndex));
+//        ++curIndex;
+//    }
+
+    std::mutex cosResultMutex;
+    __gnu_parallel::for_each(allUsersData.begin(), allUsersData.end(),
+            [&cosResult, &cosResultMutex, &curIndex, &userData]
+            (const UserInfoVector& user) {
+                auto cosValue = cosBetweenTwoUsers(userData, user);
+                cosResultMutex.lock();
+                cosResult.emplace_back(CosValueIndex(cosValue, curIndex));
+                ++curIndex;
+                cosResultMutex.unlock();
+    });
 
     // having song > not having song, else compare by cos value
     auto cosComparerWithSong = [&allUsersData, &songID](const CosValueIndex& lhs, const CosValueIndex& rhs) -> bool {
