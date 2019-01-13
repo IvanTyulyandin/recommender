@@ -33,10 +33,13 @@ int main(int argc, char* argv[]) {
             predictFromNeighborsWithSongMark,
             50, 5);
 
+    std::cout << "Counting RMSE score\n";
     auto rmse_val = rmse.get();
+    std::cout << "RMSE score: " << rmse_val << '\n';
+
+    std::cout << "Counting nDCG and Gini scores\n";
     auto ndsg_gini_val = ndsg_gini.get();
-    std::cout << "RMSE score: " << rmse_val << '\n'
-        << "nDCG score: " << ndsg_gini_val.first << '\n'
+    std::cout << "nDCG score: " << ndsg_gini_val.first << '\n'
         << "Gini score: " << ndsg_gini_val.second << '\n';
 
     return 0;
