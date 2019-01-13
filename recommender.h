@@ -15,9 +15,9 @@ typedef std::pair<SongID, size_t> SongScore;
 typedef vector<SongScore> UserInfoVector;
 typedef vector<UserInfoVector> UsersDataVector;
 typedef std::pair<double, size_t> CosValueIndex;
+typedef vector<SongID> SongsVector;
 
-
-void readData(const string& inputFile, UsersDataVector& data);
+void readData(const string& inputFile, UsersDataVector& data, SongsVector& songs);
 
 void printDataVectorWithNames(const UsersDataVector& data);
 

@@ -3,11 +3,12 @@
 #include <fstream>
 #include <iostream>
 #include <parallel/algorithm>
+#include <unordered_set>
 
 #include "recommender.h"
 
 
-void readData(const string& inputFile, UsersDataVector& data) {
+void readData(const string& inputFile, UsersDataVector& data, SongsVector& songs) {
 
     std::ifstream fileStream(inputFile, std::fstream::in);
     if (fileStream.fail()) {
@@ -20,12 +21,14 @@ void readData(const string& inputFile, UsersDataVector& data) {
     size_t score;
     string prevUserID = userID;
 
+    std::unordered_set<SongID> uniqueSongs;
     data = UsersDataVector();
     data.reserve(USERS);
 
     // suppose file structure is "userID \t songID \t score \n"
     // \t is whitespace symbol, so stream will skip \t
     while (fileStream >> userID >> songID >> score) {
+        uniqueSongs.insert(songID);
         if (prevUserID != userID) {
             prevUserID = userID;
             data.push_back(UserInfoVector());
@@ -36,7 +39,7 @@ void readData(const string& inputFile, UsersDataVector& data) {
     }
 
     data.shrink_to_fit();
-
+    songs = SongsVector(uniqueSongs.begin(), uniqueSongs.end());
     // don't need to sort, dataset is sorted already
     fileStream.close();
 }
@@ -56,6 +59,12 @@ void printDataVectorWithNames(const UsersDataVector& data) {
 
 
 double cosBetweenTwoUsers(const UserInfoVector& fst, const UserInfoVector& snd) {
+
+    // if no any info about a user set cosine to 0
+    if (fst.empty() || snd.empty()) {
+        return 0;
+    }
+
     size_t fstSumMarksSqr = 0;
     size_t sndSumMarksSqr = 0;
     size_t sumCommonMarksMult = 0;
