@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <functional>
 
 using std::vector;
 using std::string;
@@ -20,6 +21,11 @@ typedef vector<UserInfoVector> UsersDataVector;
 typedef std::pair<double, size_t> CosValueIndex;
 typedef vector<SongID> SongsVector;
 
+using PredictFunction = std::function<vector<size_t>(
+        const UsersDataVector &allUsersData,
+        const UserInfoVector &userData,
+        const vector<SongID> &songsID,
+        size_t topK)>;
 
 void readData(const string& inputFile, UsersDataVector& data, SongsVector& songs);
 
@@ -31,12 +37,12 @@ vector<size_t> predictFromNeighborsWithSongMark(
         const UsersDataVector &allUsersData,
         const UserInfoVector &userData,
         const vector<SongID> &songsID,
-        size_t topK = K_USERS
+        size_t topK = K_USERS // number of nearest users
 );
 
 vector<size_t> predictSongsFromNearestNeighbors(
         const UsersDataVector& allUsersData,
         const UserInfoVector& userData,
         const vector<SongID>& songsToPredict,
-        size_t topK = K_USERS
+        size_t topK = K_USERS // number of nearest users
 );

@@ -10,7 +10,11 @@
 // k-folds cross validation
 // for each user select a random song and try to predict it's value
 
-double crossValidationRMSE(UsersDataVector& allUsersData, size_t k = 10) {
+double crossValidationRMSE(
+        UsersDataVector& allUsersData,
+        const PredictFunction& predictor,
+        size_t k = 10
+) {
     auto size = allUsersData.size();
 
     UsersDataVector extractedData;
@@ -37,77 +41,76 @@ double crossValidationRMSE(UsersDataVector& allUsersData, size_t k = 10) {
             vector<SongID> oneSongVector; // size of 1 for rmse checking
             oneSongVector.push_back(songToPredict);
 
-            vector<size_t> predictedValue = predictFromNeighborsWithSongMark(
+            vector<size_t> predictedValue = predictor(
                     allUsersData,
                     userToPredict,
-                    oneSongVector);
+                    oneSongVector,
+                    K_USERS);
             auto curSum = static_cast<int>(predictedValue[0]) - static_cast<int>(scoreToPredict);
             sqrSum += curSum * curSum;
         }
-        std::cout << "RMSE is done\n";
+
         //restore user data
         std::move(extractedData.begin(), extractedData.end(), iter);
-        std::cout << "move is done\n";
-        break;
     }
 
     // got 1 song from each user
-    return sqrt(sqrSum / (oneBlockSize));
+    return sqrt(sqrSum / (oneBlockSize * k));
 }
 
 
 namespace {
-double DCG(const vector<size_t>& relevances) {
-    size_t k = relevances.size();
-    if (!k)
-        return 0;
+    double DCG(const vector<size_t>& relevances) {
+        size_t k = relevances.size();
+        if (!k)
+            return 0;
 
-    double dcg = relevances[0];
-    for (auto i = 1; i < k; ++i) {
-        dcg += relevances[i] / log2(i + 1);
-    }
-    return dcg;
-}
-
-double nDCG(const vector<SongScore>& predicted,
-            const UserInfoVector& realData) {
-    auto N = predicted.size();
-    vector<size_t> relevances;
-    relevances.reserve(N);
-
-    for (auto&& songScore : predicted) {
-        auto it = std::find_if(realData.begin(), realData.end(),
-                [&songScore](const SongScore& ss) { return songScore.first == ss.first;});
-        if (it != realData.end())
-            relevances.emplace_back(it->second);
-        else
-            relevances.emplace_back(0);
+        double dcg = relevances[0];
+        for (auto i = 1; i < k; ++i) {
+            dcg += relevances[i] / log2(i + 1);
+        }
+        return dcg;
     }
 
-    auto dcg = DCG(relevances);
-    std::sort(relevances.begin(), relevances.end(), std::greater<>());
-    auto idcg = DCG(relevances);
-    //std::cout << dcg << ", " << idcg << '\n';
-    return dcg / idcg;
-}
+    double nDCG(const vector<SongScore>& predicted,
+                const UserInfoVector& realData) {
+        auto N = predicted.size();
+        vector<size_t> relevances;
+        relevances.reserve(N);
 
-double Gini(const std::unordered_map<SongID, size_t>& timesRecommended) {
-    size_t size = timesRecommended.size();
-    vector<size_t> scores;
-    scores.reserve(size);
+        for (auto&& songScore : predicted) {
+            auto it = std::find_if(realData.begin(), realData.end(),
+                    [&songScore](const SongScore& ss) { return songScore.first == ss.first;});
+            if (it != realData.end())
+                relevances.emplace_back(it->second);
+            else
+                relevances.emplace_back(0);
+        }
 
-    for (auto&& songScore : timesRecommended)
-        scores.push_back(songScore.second);
+        auto dcg = DCG(relevances);
+        std::sort(relevances.begin(), relevances.end(), std::greater<>());
+        auto idcg = DCG(relevances);
 
-    __gnu_parallel::sort(scores.begin(), scores.end());
+        return dcg / idcg;
+    }
 
-    double gini = 0;
+    double Gini(const std::unordered_map<SongID, size_t>& timesRecommended) {
+        size_t size = timesRecommended.size();
+        vector<size_t> scores;
+        scores.reserve(size);
 
-    for (auto i = 0; i != size; ++i)
-        gini += (2 * i - size - 1) * scores[i];
+        for (auto&& songScore : timesRecommended)
+            scores.push_back(songScore.second);
 
-    return gini / (--size);
-}
+        __gnu_parallel::sort(scores.begin(), scores.end());
+
+        double gini = 0;
+
+        for (auto i = 0; i != size; ++i)
+            gini += (2 * i - size - 1) * scores[i];
+
+        return gini / (--size);
+    }
 }
 
 // k-folds cross validation
@@ -117,6 +120,7 @@ double Gini(const std::unordered_map<SongID, size_t>& timesRecommended) {
 std::pair<double, double> crossValidateNDCGandGini(
         UsersDataVector& allUsersData,
         const SongsVector& songs,
+        const PredictFunction& predictor,
         size_t k = 10,
         size_t topN = 3
 ) {
@@ -157,7 +161,7 @@ std::pair<double, double> crossValidateNDCGandGini(
                 lastUserSongs.push_back(iterToSong->first);
             }
 
-            auto predictTopN = predictSongsFromNearestNeighbors(allUsersData, userWithoutLastN, lastUserSongs);
+            auto predictTopN = predictor(allUsersData, userWithoutLastN, lastUserSongs, topN);
 
             predictedResults.clear();
 
@@ -178,106 +182,12 @@ std::pair<double, double> crossValidateNDCGandGini(
 
             ndsg += nDCG(predictedResults, userToPredict);
         }
-        std::cout << "ndcg is done\n";
+
         //restore user data
         std::move(testData.begin(), testData.end(), iter);
-        std::cout << "move is done\n";
-        break;
     }
+
     double gini = Gini(timesRecommended);
-    std::cout << "gini is done\n";
 
-    return std::make_pair(ndsg / oneBlockSize, gini);
+    return std::make_pair(ndsg / (oneBlockSize * k), gini);
 }
-
-//
-//double RMSEatLastUsers(UsersDataVector& allUsersData, size_t lastUsersNumber = 100) {
-//
-//    auto testDataBeginIter = allUsersData.end() - lastUsersNumber;
-//    auto testDataEndIter = allUsersData.end();
-//    auto lastUsersRealData = UsersDataVector(testDataBeginIter, testDataEndIter);
-//
-//    // replace part of current data
-//    __gnu_parallel::for_each(testDataBeginIter, testDataEndIter,
-//                             [](UserInfoVector& info) {info.clear();});
-//
-//    double sumOfErrors = 0.0;
-//    for (auto&& userToPredict : lastUsersRealData) {
-//        std::cout << "User done\n";
-//
-//        //take last song and try to predict it
-//        auto realSongScore = userToPredict.back();
-//        userToPredict.pop_back();
-//
-//        auto predicted = predictFromNeighborsWithSongMark(allUsersData, userToPredict, realSongScore.first);
-//        sumOfErrors += pow(predicted - realSongScore.second, 2);
-//
-//        //restore data
-//        userToPredict.push_back(realSongScore);
-//    }
-//
-//    // restore data taken to test
-//    std::move(lastUsersRealData.begin(), lastUsersRealData.end(), testDataBeginIter);
-//
-//    return sqrt(sumOfErrors / lastUsersNumber);
-//}
-//
-//
-//std::pair<double, double> NDCGandGiniatLastUsers(
-//        UsersDataVector& allUsersData,
-//        const SongsVector& songs,
-//        size_t topN = TOP_K,
-//        size_t lastUsersNumber = 100
-//) {
-//    vector<SongScore> predictedResults;
-//    predictedResults.reserve(songs.size());
-//
-//    std::unordered_map<SongID, size_t> timesRecommended;
-//    timesRecommended.reserve(songs.size());
-//
-//    __gnu_parallel::for_each(songs.begin(), songs.end(),
-//                             [&timesRecommended](const SongID& song) {
-//                                 timesRecommended[song] = 0;
-//                             });
-//
-//    auto testDataBeginIter = allUsersData.end() - lastUsersNumber;
-//    auto testDataEndIter = allUsersData.end();
-//    auto lastUsersRealData = UsersDataVector(testDataBeginIter, testDataEndIter);
-//
-//    double ndsg = 0.0;
-//
-//    for (auto&& userToPredict : lastUsersRealData) {
-//
-//        auto userWithoutLastN = UserInfoVector(userToPredict.begin(), userToPredict.end() - topN);
-//
-//        predictedResults.clear();
-//        for (auto&& song : songs) {
-//            predictedResults.emplace_back(
-//                    SongScore(song, predictFromNeighborsWithSongMark(allUsersData, userWithoutLastN, song)));
-//            std::cout << "1 song prediction done\n";
-//        }
-//
-//        __gnu_parallel::partial_sort(
-//                predictedResults.begin(),
-//                predictedResults.begin() + topN - 1,
-//                predictedResults.end(),
-//                [](const SongScore& lhs, const SongScore& rhs) {
-//                    return lhs.second > rhs.second;
-//                });
-//
-//        auto afterNth = predictedResults.begin() + topN;
-//        for (auto&& i = predictedResults.begin(); i < afterNth; ++i) {
-//            timesRecommended[i->first] += 1;
-//        }
-//
-//        ndsg += nDCG(vector<SongScore>(predictedResults.begin(), afterNth), userToPredict);
-//
-//        std::cout << "User done\n";
-//    }
-//
-//    std::move(lastUsersRealData.begin(), lastUsersRealData.end(), testDataBeginIter);
-//
-//    double gini = Gini(timesRecommended);
-//
-//    return std::make_pair(ndsg / lastUsersNumber, gini);
-//}
