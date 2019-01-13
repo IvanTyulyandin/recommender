@@ -37,29 +37,35 @@ double crossValidationRMSE(UsersDataVector& allUsersData, size_t k = 10) {
             vector<SongID> oneSongVector; // size of 1 for rmse checking
             oneSongVector.push_back(songToPredict);
 
-            vector<size_t> predictedValue = predictSongsFromNearestNeighbors(
+            vector<size_t> predictedValue = predictFromNeighborsWithSongMark(
                     allUsersData,
                     userToPredict,
                     oneSongVector);
-            sqrSum += pow((predictedValue[0] - scoreToPredict), 2);
-
+            auto curSum = static_cast<int>(predictedValue[0]) - static_cast<int>(scoreToPredict);
+            sqrSum += curSum * curSum;
         }
-
+        std::cout << "RMSE is done\n";
         //restore user data
         std::move(extractedData.begin(), extractedData.end(), iter);
+        std::cout << "move is done\n";
+        break;
     }
 
     // got 1 song from each user
-    return sqrt(sqrSum / (oneBlockSize * k));
+    return sqrt(sqrSum / (oneBlockSize));
 }
 
 
 namespace {
 double DCG(const vector<size_t>& relevances) {
     size_t k = relevances.size();
-    double dcg = 0;
-    for (auto i = 0; i != k; ++i)
+    if (!k)
+        return 0;
+
+    double dcg = relevances[0];
+    for (auto i = 1; i < k; ++i) {
         dcg += relevances[i] / log2(i + 1);
+    }
     return dcg;
 }
 
@@ -81,6 +87,7 @@ double nDCG(const vector<SongScore>& predicted,
     auto dcg = DCG(relevances);
     std::sort(relevances.begin(), relevances.end(), std::greater<>());
     auto idcg = DCG(relevances);
+    //std::cout << dcg << ", " << idcg << '\n';
     return dcg / idcg;
 }
 
@@ -170,16 +177,17 @@ std::pair<double, double> crossValidateNDCGandGini(
             }
 
             ndsg += nDCG(predictedResults, userToPredict);
-
-            std::cout << "User in NDCG and Gini done\n";
         }
-
+        std::cout << "ndcg is done\n";
         //restore user data
         std::move(testData.begin(), testData.end(), iter);
+        std::cout << "move is done\n";
+        break;
     }
     double gini = Gini(timesRecommended);
+    std::cout << "gini is done\n";
 
-    return std::make_pair(ndsg / allUsersData.size(), gini);
+    return std::make_pair(ndsg / oneBlockSize, gini);
 }
 
 //

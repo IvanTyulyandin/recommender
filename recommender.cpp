@@ -109,20 +109,16 @@ double cosBetweenTwoUsers(const UserInfoVector& fst, const UserInfoVector& snd) 
 }
 
 
-size_t predictFromNeighborsWithSongMark(
+vector<size_t> predictFromNeighborsWithSongMark(
         const UsersDataVector &allUsersData,
         const UserInfoVector &userData,
-        const SongID &songID,
+        const vector<SongID> &songsID,
         size_t topK // topK has default value == K_USERS
 ) {
+    auto songID = songsID[0];
     size_t curIndex = 0;
     vector<CosValueIndex> cosResult;
     cosResult.reserve(allUsersData.size());
-
-//    for (auto&& user : allUsersData) {
-//        cosResult.emplace_back(CosValueIndex(cosBetweenTwoUsers(userData, user), curIndex));
-//        ++curIndex;
-//    }
 
     std::mutex cosResultMutex;
     __gnu_parallel::for_each(allUsersData.begin(), allUsersData.end(),
@@ -173,7 +169,9 @@ size_t predictFromNeighborsWithSongMark(
         }
     }
 
-    return sumOfMarks / topK;
+    vector<size_t> mark;
+    mark.push_back(sumOfMarks / topK);
+    return mark;
 
 }
 
