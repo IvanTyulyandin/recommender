@@ -108,10 +108,10 @@ double cosBetweenTwoUsers(const UserInfoVector& fst, const UserInfoVector& snd) 
 }
 
 
-size_t predictSongListening(
-        const UsersDataVector& allUsersData,
-        const UserInfoVector& userData,
-        const SongID& songID,
+size_t predictFromNeighborsWithSongMark(
+        const UsersDataVector &allUsersData,
+        const UserInfoVector &userData,
+        const SongID &songID,
         size_t topK // topK has default value == K_USERS
 ) {
     size_t curIndex = 0;
@@ -123,7 +123,7 @@ size_t predictSongListening(
     }
 
     // having song > not having song, else compare by cos value
-    auto cosComparer = [&allUsersData, &songID](const CosValueIndex& lhs, const CosValueIndex& rhs) -> bool {
+    auto cosComparerWithSong = [&allUsersData, &songID](const CosValueIndex& lhs, const CosValueIndex& rhs) -> bool {
         const UserInfoVector& lhsInfo = allUsersData[lhs.second];
         const UserInfoVector& rhsInfo = allUsersData[rhs.second];
 
@@ -143,7 +143,7 @@ size_t predictSongListening(
     };
 
     // waiting for c++ 17 in 2019
-    __gnu_parallel::nth_element(cosResult.begin(), cosResult.begin() + topK - 1, cosResult.end(), cosComparer);
+    __gnu_parallel::nth_element(cosResult.begin(), cosResult.begin() + topK - 1, cosResult.end(), cosComparerWithSong);
 
     size_t sumOfMarks = 0;
     auto elemAfterKth = cosResult.begin() + topK;
@@ -162,4 +162,79 @@ size_t predictSongListening(
 
     return sumOfMarks / topK;
 
+}
+
+namespace {
+    // return top k nearestNeighbors as vector of indexes
+    vector<size_t> nearestNeighbors(
+            const UsersDataVector& allUsersData,
+            const UserInfoVector& userData,
+            size_t k = TOP_K
+    ) {
+        size_t curIndex = 0;
+        vector<CosValueIndex> cosResult;
+        cosResult.reserve(allUsersData.size());
+        for (auto &&user : allUsersData) {
+            cosResult.emplace_back(CosValueIndex(cosBetweenTwoUsers(userData, user), curIndex));
+            ++curIndex;
+        }
+
+        // for descending sort
+        auto cosComparer = [](const CosValueIndex &lhs, const CosValueIndex &rhs) {
+            return lhs.first > rhs.first;
+        };
+
+        __gnu_parallel::partial_sort(cosResult.begin(), cosResult.begin() + k - 1, cosResult.end(), cosComparer);
+
+        vector<size_t> result;
+        result.reserve(k);
+
+        auto afterKth = cosResult.begin() + k;
+        for (auto &&iter = cosResult.begin(); iter < afterKth; ++iter) {
+            result.push_back(iter->second);
+        }
+
+        return result;
+    }
+
+
+    size_t predictOneSongFromNeighbors(
+            const UsersDataVector& allUsersData,
+            const vector<size_t>& neighbors,
+            const SongID& songToPredict
+    ) {
+        size_t sumOfNeighborsMarks = 0;
+
+        for (auto&& index : neighbors) {
+            const auto& curUser = allUsersData[index];
+            auto songScoreIter = std::find_if(curUser.begin(), curUser.end(),
+                    [&songToPredict](const SongScore& ss) {
+                        return ss.first == songToPredict;
+            });
+
+            if (songScoreIter != curUser.end())
+                sumOfNeighborsMarks += songScoreIter->second;
+            // else sumOfNeighborsMarks += 0
+        }
+
+        return sumOfNeighborsMarks / neighbors.size();
+    }
+}
+
+
+vector<size_t> predictSongsFromNearestNeighbors(
+        const UsersDataVector& allUsersData,
+        const UserInfoVector& userData,
+        const vector<SongID>& songsToPredict,
+        size_t topK // has default value K_USERS
+) {
+    auto topNeighbors = nearestNeighbors(allUsersData, userData, topK);
+    vector<size_t> result;
+    result.reserve(songsToPredict.size());
+
+    for (auto&& song : songsToPredict) {
+        result.push_back(predictOneSongFromNeighbors(allUsersData, topNeighbors, song));
+    }
+
+    return result;
 }
