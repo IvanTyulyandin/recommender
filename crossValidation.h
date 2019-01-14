@@ -4,6 +4,8 @@
 #include <cmath>
 #include <unordered_map>
 #include <parallel/algorithm>
+#include <numeric>
+#include <functional>
 
 #include "recommender.h"
 
@@ -109,7 +111,9 @@ namespace {
         for (auto i = 0; i != size; ++i)
             gini += (2 * i - size - 1) * scores[i];
 
-        return gini / (--size);
+        size_t sumOfScores = std::accumulate(scores.begin(), scores.end(), size_t(0), std::plus<>());
+
+        return gini / (--size) / sumOfScores;
     }
 }
 
