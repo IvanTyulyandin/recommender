@@ -29,8 +29,8 @@ double crossValidationRMSE(
 
         // replace part of current data
         auto endOfReplacement = iter + oneBlockSize;
-        __gnu_parallel::transform(iter, iter + oneBlockSize, iter,
-                [](UserInfoVector& info) {info.clear(); return info;});
+        __gnu_parallel::for_each(iter, iter + oneBlockSize,
+                [](UserInfoVector& info) {info.clear();});
 
         for (auto&& userToPredict : extractedData) {
 

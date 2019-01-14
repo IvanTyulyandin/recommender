@@ -1,8 +1,6 @@
 #include <iostream>
 #include <future>
 
-#include <future>
-
 #include "recommender.h"
 #include "crossValidation.h"
 
@@ -12,7 +10,7 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         readData(argv[1], data, songs);
     } else {
-        readData("../train_triplets.txt", data, songs);
+        readData("train_triplets.txt", data, songs);
     }
 
     std::cout << "Read data\n";
@@ -25,7 +23,7 @@ int main(int argc, char* argv[]) {
             std::ref(data),
             predictFromNeighborsWithSongMark,
             50);
-    auto ndsg_gini = std::async(
+    auto ndcg_gini = std::async(
             std::launch::async,
             crossValidateNDCGandGini,
             std::ref(copyData),
@@ -38,9 +36,9 @@ int main(int argc, char* argv[]) {
     std::cout << "RMSE score: " << rmse_val << '\n';
 
     std::cout << "Counting nDCG and Gini scores\n";
-    auto ndsg_gini_val = ndsg_gini.get();
-    std::cout << "nDCG score: " << ndsg_gini_val.first << '\n'
-        << "Gini score: " << ndsg_gini_val.second << '\n';
+    auto ndcg_gini_val = ndcg_gini.get();
+    std::cout << "nDCG score: " << ndcg_gini_val.first << '\n'
+        << "Gini score: " << ndcg_gini_val.second << '\n';
 
     return 0;
 }
