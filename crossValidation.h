@@ -30,7 +30,6 @@ double crossValidationRMSE(
         extractedData = UsersDataVector(iter, iter + oneBlockSize);
 
         // replace part of current data
-        auto endOfReplacement = iter + oneBlockSize;
         __gnu_parallel::for_each(iter, iter + oneBlockSize,
                 [](UserInfoVector& info) {info.clear();});
 
@@ -63,12 +62,11 @@ double crossValidationRMSE(
 
 namespace {
     double DCG(const vector<size_t>& relevances) {
-        size_t k = relevances.size();
-        if (!k)
+        if (!relevances.empty())
             return 0;
 
         double dcg = relevances[0];
-        for (auto i = 1; i < k; ++i) {
+        for (unsigned i = 1; i < relevances.size(); ++i) {
             dcg += relevances[i] / log2(i + 1);
         }
         return dcg;
@@ -76,9 +74,8 @@ namespace {
 
     double nDCG(const vector<SongScore>& predicted,
                 const UserInfoVector& realData) {
-        auto N = predicted.size();
         vector<size_t> relevances;
-        relevances.reserve(N);
+        relevances.reserve(predicted.size());
 
         for (auto&& songScore : predicted) {
             auto it = std::find_if(realData.begin(), realData.end(),
@@ -97,9 +94,8 @@ namespace {
     }
 
     double Gini(const std::unordered_map<SongID, size_t>& timesRecommended) {
-        size_t size = timesRecommended.size();
         vector<size_t> scores;
-        scores.reserve(size);
+        scores.reserve(timesRecommended.size());
 
         for (auto&& songScore : timesRecommended)
             scores.push_back(songScore.second);
@@ -108,12 +104,12 @@ namespace {
 
         double gini = 0;
 
-        for (auto i = 0; i != size; ++i)
-            gini += (2 * i - size - 1) * scores[i];
+        for (unsigned i = 0; i != timesRecommended.size(); ++i)
+            gini += (2 * i - timesRecommended.size() - 1) * scores[i];
 
         size_t sumOfScores = std::accumulate(scores.begin(), scores.end(), size_t(0), std::plus<>());
 
-        return gini / (--size) / sumOfScores;
+        return gini / (timesRecommended.size() - 1) / sumOfScores;
     }
 }
 
@@ -128,10 +124,9 @@ std::pair<double, double> crossValidateNDCGandGini(
         size_t k = 10,
         size_t topN = 3
 ) {
-    auto size = allUsersData.size();
 
     UsersDataVector testData;
-    auto oneBlockSize = size / k;
+    auto oneBlockSize = allUsersData.size() / k;
     testData.reserve(oneBlockSize);
 
     vector<SongScore> predictedResults;
@@ -152,7 +147,6 @@ std::pair<double, double> crossValidateNDCGandGini(
         testData = UsersDataVector(iter, iter + oneBlockSize - 1);
 
         // replace part of current data
-        auto endOfReplacement = iter + oneBlockSize - 1;
         __gnu_parallel::for_each(iter, iter + oneBlockSize,
                                   [](UserInfoVector& info) {info.clear();});
 
@@ -169,7 +163,7 @@ std::pair<double, double> crossValidateNDCGandGini(
 
             predictedResults.clear();
 
-            for (auto i = 0; i < topN; ++i) {
+            for (unsigned i = 0; i < topN; ++i) {
                 predictedResults.emplace_back(std::move(lastUserSongs[i]), predictTopN[i]);
             }
 

@@ -49,9 +49,8 @@ void readData(const string& inputFile, UsersDataVector& data, SongsVector& songs
 void printDataVectorWithNames(const UsersDataVector& data) {
     using std::cout;
 
-    auto size = data.size();
-    for (auto i = 0; i < size; ++i) {
-        for (auto&& songAndScore : data[i]) {
+    for (auto&& i : data) {
+        for (auto&& songAndScore : i) {
             cout << songAndScore.first << ' ' << songAndScore.second << '\n';
         }
         cout << "\n\n";
@@ -157,7 +156,7 @@ vector<size_t> predictFromNeighborsWithSongMark(
     size_t sumOfMarks = 0;
     auto elemAfterKth = cosResult.begin() + topK;
     for (auto&& i = cosResult.begin(); i < elemAfterKth; ++i) {
-        auto user = allUsersData[i->second];
+        const auto& user = allUsersData[i->second];
 
         // beware of similar users without mark of sondID
         auto iterSongScore = std::find_if(user.begin(), user.end(), [&songID](const SongScore& it) -> bool {
